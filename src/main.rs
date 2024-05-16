@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
 use std::process::{ExitCode, Termination};
+use std::ops::{ControlFlow, Try};
 
 fn main() -> CliResult<()> {
     println!("Hello, world!");
@@ -25,26 +26,12 @@ impl <T> Termination for CliResult<T> {
     }
 }
 
-impl<T> TryFrom<CliResult<T>> for Result<T, CliResult<T>> {
-    type Ok = T;
-    type Error = CliError;
-
-    fn from_error(err: Self::Error) -> Self {
-        Exit::Err(err)
-    }
-
-    fn try_from(value: CliResult<T>) -> Result<Self, Self::Error> {
-        todo!()
-    }
-}
-
 
 #[derive(Debug)]
-pub enum CliError<T: Error> {
+pub enum CliError {
     Processing(String),
     Retryable(String),
     Anyhow(anyhow::Error),
-    Error(T)
 }
 
 impl std::error::Error for CliError {}
