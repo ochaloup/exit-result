@@ -7,7 +7,7 @@ fn main() -> CliResult {
 }
 
 fn real_main() -> anyhow::Result<()> {
-    Err(CliError::retryable("This is a retryable error".to_string()))
+    Err(CliError::retryable("This is a retryable error"))
 }
 
 impl Termination for CliResult {
