@@ -1,37 +1,47 @@
-use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
 use std::process::{ExitCode, Termination};
-use std::ops::{ControlFlow, Try};
 
-fn main() -> CliResult<()> {
-    println!("Hello, world!");
-    CliError::Retryable("Error processing".to_string())
+fn main() -> CliResult {
+    CliResult(real_main())
 }
 
-pub enum CliResult<T> {
-    Ok(T),
-    Err(CliError),
+fn real_main() -> anyhow::Result<()> {
+    Err(CliError::retryable("This is a retryable error".to_string()))
 }
 
-impl <T> Termination for CliResult<T> {
+impl Termination for CliResult {
     fn report(self) -> ExitCode {
-        match self {
-            CliResult::Ok(_) => ExitCode::SUCCESS,
-            CliResult::Err(err) => {
-                eprintln!("Error: {:?}", err);
-                ExitCode::from(<u8 as From<CliError>>::from(err))
-            },
+        match self.0 {
+            Ok(_) => ExitCode::SUCCESS,
+            Err(x) => {
+                if let Ok(cli_error) = x.downcast::<CliError>() {
+                    cli_error.into()
+                } else {
+                    ExitCode::FAILURE
+                }
+            }
         }
     }
 }
+
+struct CliResult(anyhow::Result<()>);
 
 
 #[derive(Debug)]
 pub enum CliError {
     Processing(String),
     Retryable(String),
-    Anyhow(anyhow::Error),
+}
+
+impl CliError {
+    pub fn processing<T: Debug>(err: T) -> anyhow::Error {
+        CliError::Processing(format!("{:?}", err)).into()
+    }
+
+    pub fn retryable<T: Debug>(err: T) -> anyhow::Error {
+        CliError::Retryable(format!("{:?}", err)).into()
+    }
 }
 
 impl std::error::Error for CliError {}
@@ -41,39 +51,18 @@ impl fmt::Display for CliError {
         match self {
             CliError::Processing(err) => write!(f, "Processing error: {}", err),
             CliError::Retryable(err) => write!(f, "Retryable error: {}", err),
-            CliError::Anyhow(err) => fmt::Display::fmt(&err, f),
         }
     }
 }
 
-impl From<CliError> for u8 {
-    fn from(err: CliError) -> u8 {
+impl From<CliError> for ExitCode {
+    fn from(err: CliError) -> ExitCode {
         match err {
-            CliError::Processing(_) => 2,
-            CliError::Retryable(_) => 100,
-            CliError::Anyhow(_) => 1,
+            CliError::Processing(_) => ExitCode::from(2),
+            CliError::Retryable(_) => ExitCode::from(100),
         }
     }
 }
 
-impl From<anyhow::Error> for CliError {
-    fn from(err: anyhow::Error) -> Self {
-        CliError::Anyhow(err)
-    }
-}
 
-// impl <T> From<CliError> for Result<T, CliResult<T>> {
-//     fn from(err: CliError) -> Self {
-//         Err(CliResult::Err(err))
-//     }
-// }
-
-impl <T> From<CliResult<T>> for anyhow::Result<T> {
-    fn from(res: CliResult<T>) -> Self {
-        match res {
-            CliResult::Ok(val) => Ok(val),
-            CliResult::Err(err) => Err(anyhow::Error::from(err)),
-        }
-    }
-}
 
